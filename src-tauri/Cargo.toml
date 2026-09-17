@@ -1,0 +1,26 @@
+[package]
+name = "solix-monitor"
+version = "0.1.0"
+description = "Local desktop monitor for Anker SOLIX Solarbank 4 E5000 Pro"
+authors = ["SOLIX Monitor contributors"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "solix_monitor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "solix-monitor"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["tray-icon"] }
+
