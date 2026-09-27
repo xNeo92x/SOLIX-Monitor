@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "de.solixmonitor.android"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "de.solixmonitor.android"
