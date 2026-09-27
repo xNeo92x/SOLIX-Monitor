@@ -4,6 +4,10 @@ Eine schlanke, lokale Desktop-App für die **Anker SOLIX Solarbank 4 E5000 Pro**
 Sie läuft unter Windows und Linux, liest die Live-Daten direkt per Modbus TCP
 aus dem Heimnetz und benötigt weder Home Assistant noch einen Cloud-Login.
 
+Eine native Android-Version befindet sich im Ordner [`android`](android/README.md).
+Sie verwendet dieselbe lokale, rein lesende Modbus-Anbindung und benötigt
+Android 8.0 oder neuer.
+
 ## Funktionen
 
 - Live-Energiefluss für PV, Haus, Batterie und Netz
