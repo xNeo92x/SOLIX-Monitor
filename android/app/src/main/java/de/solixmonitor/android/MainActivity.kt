@@ -1,5 +1,8 @@
 package de.solixmonitor.android
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -64,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import de.solixmonitor.android.data.HistoryPoint
 import de.solixmonitor.android.data.SolixSettings
 import de.solixmonitor.android.data.SolixSnapshot
@@ -84,6 +89,7 @@ import kotlin.math.max
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestLocalNetworkPermission()
         setContent {
             SolixTheme {
                 val viewModel: SolixViewModel = viewModel()
@@ -98,6 +104,26 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun requestLocalNetworkPermission() {
+        if (
+            Build.VERSION.SDK_INT == 36 &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.NEARBY_WIFI_DEVICES,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES),
+                LOCAL_NETWORK_PERMISSION_REQUEST,
+            )
+        }
+    }
+
+    private companion object {
+        const val LOCAL_NETWORK_PERMISSION_REQUEST = 1001
     }
 }
 
