@@ -4,13 +4,15 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.SocketTimeoutException
 
 internal class ModbusTcpClient(
     host: String,
     port: Int,
     private val unitId: Int,
+    private val socket: Socket = Socket(),
 ) : AutoCloseable {
-    private val socket = Socket()
+    private val target = "${host.trim()}:$port"
     private lateinit var input: DataInputStream
     private lateinit var output: DataOutputStream
     private var transactionId = 0
@@ -24,7 +26,10 @@ internal class ModbusTcpClient(
             output = DataOutputStream(socket.getOutputStream())
         } catch (error: Exception) {
             runCatching { socket.close() }
-            throw IllegalStateException("Keine Verbindung zu ${host.trim()}:$port: ${error.message ?: "unbekannter Fehler"}", error)
+            throw IllegalStateException(
+                "TCP-Verbindung zu $target fehlgeschlagen: ${error.message ?: "unbekannter Fehler"}",
+                error,
+            )
         }
     }
 
@@ -37,16 +42,26 @@ internal class ModbusTcpClient(
         require(address in 0..65535) { "Ungültige Registeradresse" }
 
         transactionId = (transactionId + 1) and 0xFFFF
-        output.writeShort(transactionId)
-        output.writeShort(0)
-        output.writeShort(6)
-        output.writeByte(unitId)
-        output.writeByte(function)
-        output.writeShort(address)
-        output.writeShort(count)
+        val request = byteArrayOf(
+            (transactionId ushr 8).toByte(), transactionId.toByte(),
+            0, 0, 0, 6,
+            unitId.toByte(), function.toByte(),
+            (address ushr 8).toByte(), address.toByte(),
+            (count ushr 8).toByte(), count.toByte(),
+        )
+        output.write(request)
         output.flush()
 
-        val responseTransaction = input.readUnsignedShort()
+        val responseTransaction = try {
+            input.readUnsignedShort()
+        } catch (error: SocketTimeoutException) {
+            throw IllegalStateException(
+                "TCP verbunden (${socket.localAddress.hostAddress} → $target), aber keine " +
+                    "Modbus-Antwort auf FC${function.toString(16).padStart(2, '0')} " +
+                    "ab Register $address empfangen.",
+                error,
+            )
+        }
         val protocol = input.readUnsignedShort()
         val length = input.readUnsignedShort()
         val responseUnitId = input.readUnsignedByte()

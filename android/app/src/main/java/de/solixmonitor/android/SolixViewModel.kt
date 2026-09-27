@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class SolixViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = SolixRepository()
+    private val repository = SolixRepository(application)
     private val settingsStore = SettingsStore(application)
     private val mutableState = MutableStateFlow(SolixUiState(settings = settingsStore.load()))
     val state: StateFlow<SolixUiState> = mutableState.asStateFlow()
@@ -55,6 +55,7 @@ class SolixViewModel(application: Application) : AndroidViewModel(application) {
             settingsStore.save(settings)
             mutableState.value = mutableState.value.copy(
                 settings = settings,
+                snapshot = null,
                 history = emptyList(),
                 connectionError = null,
                 showSettings = false,
