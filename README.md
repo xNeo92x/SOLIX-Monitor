@@ -72,6 +72,59 @@ Unter Linux entstehen je nach System AppImage-/DEB-/RPM-Pakete, unter Windows
 ein MSI- und/oder NSIS-Installer. Alternativ kann der mitgelieferte GitHub-
 Actions-Workflow beide Plattformen automatisch bauen.
 
+## Android-APK erstellen
+
+Die einfachste Variante benötigt keine lokale Entwicklungsumgebung:
+
+1. Im GitHub-Repository **Actions → Android Build** öffnen.
+2. **Run workflow** wählen und den Lauf starten.
+3. Nach erfolgreichem Abschluss den Lauf öffnen.
+4. Unter **Artifacts** `SOLIX-Monitor-Android-debug` herunterladen.
+5. Das ZIP-Archiv entpacken und `app-debug.apk` auf dem Android-Gerät
+   installieren.
+
+Für einen lokalen Build werden JDK 17 sowie Android SDK 36 mit Build Tools
+36.0.0 benötigt. Beides lässt sich beispielsweise über Android Studio und den
+SDK Manager installieren. Der enthaltene Gradle Wrapper lädt die passende
+Gradle-Version selbstständig herunter.
+
+Linux/macOS:
+
+```bash
+git clone https://github.com/xNeo92x/SOLIX-Monitor.git
+cd SOLIX-Monitor/android
+chmod +x gradlew
+./gradlew clean testDebugUnitTest assembleDebug
+```
+
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/xNeo92x/SOLIX-Monitor.git
+Set-Location .\SOLIX-Monitor\android
+.\gradlew.bat clean testDebugUnitTest assembleDebug
+```
+
+Die fertige, automatisch signierte Debug-APK liegt anschließend unter:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Installation über ADB, ausgeführt aus dem Ordner `android`:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Falls Android wegen einer abweichenden Signatur kein Update zulässt, muss die
+bereits installierte Debug-Version zuerst deinstalliert werden. Dabei werden
+deren lokal gespeicherte Einstellungen gelöscht. Für eine dauerhaft
+veröffentlichte Release-APK sollte in Android Studio über **Build → Generate
+Signed Bundle / APK → APK** ein eigener, sicher verwahrter Signaturschlüssel
+verwendet werden. Weitere Android-Hinweise stehen in
+[`android/README.md`](android/README.md).
+
 ## Datenschutz und Sicherheit
 
 Die Anwendung kommuniziert ausschließlich mit der in den Einstellungen
