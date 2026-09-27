@@ -6,6 +6,12 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -265,6 +272,17 @@ private fun ErrorCard(message: String) {
 
 @Composable
 private fun EnergyFlowCard(snapshot: SolixSnapshot?) {
+    val flowTransition = rememberInfiniteTransition(label = "energy-flow")
+    val flowProgress by flowTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_050, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "flow-progress",
+    )
+
     DashboardCard {
         SectionHeader(
             eyebrow = "LIVE",
@@ -284,19 +302,78 @@ private fun EnergyFlowCard(snapshot: SolixSnapshot?) {
             val muted = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             Canvas(Modifier.matchParentSize()) {
                 val center = Offset(size.width / 2f, size.height / 2f - 12.dp.toPx())
-                fun line(to: Offset, active: Boolean, color: Color) {
+                val dashLength = 8.dp.toPx()
+                val dashGap = 9.dp.toPx()
+                val dashCycle = dashLength + dashGap
+
+                fun pointBetween(start: Offset, end: Offset, progress: Float) = Offset(
+                    x = start.x + (end.x - start.x) * progress,
+                    y = start.y + (end.y - start.y) * progress,
+                )
+
+                fun flowLine(
+                    node: Offset,
+                    active: Boolean,
+                    color: Color,
+                    flowsToCenter: Boolean,
+                ) {
                     drawLine(
-                        color = if (active) color else muted,
+                        color = muted,
                         start = center,
-                        end = to,
+                        end = node,
                         strokeWidth = 3.dp.toPx(),
                         cap = StrokeCap.Round,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashLength, dashGap)),
                     )
+
+                    if (!active) return
+
+                    drawLine(
+                        color = color.copy(alpha = 0.9f),
+                        start = center,
+                        end = node,
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        pathEffect = PathEffect.dashPathEffect(
+                            intervals = floatArrayOf(dashLength, dashGap),
+                            phase = -flowProgress * dashCycle,
+                        ),
+                    )
+
+                    val start = if (flowsToCenter) node else center
+                    val end = if (flowsToCenter) center else node
+                    repeat(2) { index ->
+                        val progress = (flowProgress + index * 0.5f) % 1f
+                        val pulse = pointBetween(start, end, progress)
+                        drawCircle(color.copy(alpha = 0.18f), 7.dp.toPx(), pulse)
+                        drawCircle(color, 3.5.dp.toPx(), pulse)
+                    }
                 }
-                line(Offset(54.dp.toPx(), 54.dp.toPx()), pvActive, SolarAmber)
-                line(Offset(size.width - 54.dp.toPx(), 54.dp.toPx()), loadActive, SolixGreen)
-                line(Offset(size.width / 2f, size.height - 48.dp.toPx()), batteryActive, SolixGreen)
-                line(Offset(size.width - 54.dp.toPx(), size.height - 48.dp.toPx()), gridActive, GridBlue)
+
+                flowLine(
+                    node = Offset(54.dp.toPx(), 54.dp.toPx()),
+                    active = pvActive,
+                    color = SolarAmber,
+                    flowsToCenter = true,
+                )
+                flowLine(
+                    node = Offset(size.width - 54.dp.toPx(), 54.dp.toPx()),
+                    active = loadActive,
+                    color = SolixGreen,
+                    flowsToCenter = false,
+                )
+                flowLine(
+                    node = Offset(size.width / 2f, size.height - 48.dp.toPx()),
+                    active = batteryActive,
+                    color = BatteryViolet,
+                    flowsToCenter = (snapshot?.batteryW ?: 0) > 0,
+                )
+                flowLine(
+                    node = Offset(size.width - 54.dp.toPx(), size.height - 48.dp.toPx()),
+                    active = gridActive,
+                    color = GridBlue,
+                    flowsToCenter = (snapshot?.gridW ?: 0) > 0,
+                )
             }
             FlowNode(
                 modifier = Modifier.align(Alignment.TopStart),
@@ -321,7 +398,7 @@ private fun EnergyFlowCard(snapshot: SolixSnapshot?) {
                     else -> "Batterie"
                 },
                 value = watts(snapshot?.batteryW),
-                color = SolixGreen,
+                color = BatteryViolet,
             )
             FlowNode(
                 modifier = Modifier.align(Alignment.BottomEnd),
