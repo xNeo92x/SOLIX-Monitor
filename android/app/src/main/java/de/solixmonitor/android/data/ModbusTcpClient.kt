@@ -83,6 +83,6 @@ internal class ModbusTcpClient(
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 3_000
-        const val IO_TIMEOUT_MS = 3_000
+        const val IO_TIMEOUT_MS = 5_000
     }
 }

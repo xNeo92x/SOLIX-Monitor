@@ -2,6 +2,7 @@ package de.solixmonitor.android.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.SocketTimeoutException
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -15,6 +16,29 @@ class SolixRepository {
     }
 
     private fun liveSnapshot(settings: SolixSettings): SolixSnapshot {
+        var lastError: Exception? = null
+        repeat(MODBUS_ATTEMPTS) { attempt ->
+            try {
+                return readLiveSnapshot(settings)
+            } catch (error: Exception) {
+                lastError = error
+                if (attempt < MODBUS_ATTEMPTS - 1) Thread.sleep(RETRY_DELAY_MS)
+            }
+        }
+
+        val error = requireNotNull(lastError)
+        if (generateSequence<Throwable>(error) { it.cause }.any { it is SocketTimeoutException }) {
+            throw IllegalStateException(
+                "Port ${settings.port} ist erreichbar, aber die Solarbank antwortet nicht auf Modbus. " +
+                    "Prüfe, ob Modbus TCP aktiviert ist, die IP zur Solarbank gehört und kein anderer " +
+                    "Modbus-Client verbunden ist.",
+                error,
+            )
+        }
+        throw error
+    }
+
+    private fun readLiveSnapshot(settings: SolixSettings): SolixSnapshot {
         ModbusTcpClient(settings.host, settings.port, settings.unitId).use { client ->
             val live = client.readInput(10000, 51)
             val totals = runCatching { client.readInput(10208, 58) }.getOrDefault(intArrayOf())
@@ -79,7 +103,7 @@ class SolixRepository {
         return SolixSnapshot(
             timestampMs = now,
             deviceModel = "Solarbank 4 E5000 Pro",
-            firmware = "Android-Demo 0.1.0",
+            firmware = "Android-Demo 0.1.1",
             connected = true,
             pvW = pv,
             loadW = load,
@@ -99,6 +123,9 @@ class SolixRepository {
     }
 
     internal companion object {
+        private const val MODBUS_ATTEMPTS = 3
+        private const val RETRY_DELAY_MS = 250L
+
         fun register(block: IntArray, start: Int, address: Int): Int? =
             block.getOrNull(address - start)
 
