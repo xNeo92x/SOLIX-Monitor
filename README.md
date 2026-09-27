@@ -1,5 +1,7 @@
 # SOLIX Monitor
 
+HINWEIS: Zu 100% mit ChatGPT erstellt und lokal unter CachyOS, Nobara und Android 16 getestet.
+
 Eine schlanke, lokale Desktop-App für die **Anker SOLIX Solarbank 4 E5000 Pro**.
 Sie läuft unter Windows und Linux, liest die Live-Daten direkt per Modbus TCP
 aus dem Heimnetz und benötigt weder Home Assistant noch einen Cloud-Login.
