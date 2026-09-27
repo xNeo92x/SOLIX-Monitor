@@ -1,6 +1,10 @@
 package de.solixmonitor.android
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.solixmonitor.android.data.HistoryPoint
@@ -61,6 +65,12 @@ class SolixViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun testConnection(settings: SolixSettings) {
+        localNetworkPermissionError()?.let { message ->
+            mutableState.value = mutableState.value.copy(
+                testConnectionState = TestConnectionState.Failure(message)
+            )
+            return
+        }
         val validation = settings.validate()
         if (validation.isFailure) {
             mutableState.value = mutableState.value.copy(
@@ -99,6 +109,13 @@ class SolixViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun refreshInternal() {
+        localNetworkPermissionError()?.let { message ->
+            mutableState.value = mutableState.value.copy(
+                refreshing = false,
+                connectionError = message,
+            )
+            return
+        }
         mutableState.value = mutableState.value.copy(refreshing = true)
         try {
             val snapshot = repository.readSnapshot(mutableState.value.settings)
@@ -135,4 +152,15 @@ class SolixViewModel(application: Application) : AndroidViewModel(application) {
             .mapNotNull { it.message }
             .firstOrNull { it.isNotBlank() }
             ?: "Unbekannter Verbindungsfehler"
+
+    private fun localNetworkPermissionError(): String? {
+        if (Build.VERSION.SDK_INT != 36) return null
+        val granted = ContextCompat.checkSelfPermission(
+            getApplication(),
+            Manifest.permission.NEARBY_WIFI_DEVICES,
+        ) == PackageManager.PERMISSION_GRANTED
+        return if (granted) null else
+            "Bitte erlaube SOLIX Monitor den Zugriff auf Geräte in der Nähe. " +
+                "Du kannst die Berechtigung unter Android → Apps → SOLIX Monitor → Berechtigungen aktivieren."
+    }
 }
