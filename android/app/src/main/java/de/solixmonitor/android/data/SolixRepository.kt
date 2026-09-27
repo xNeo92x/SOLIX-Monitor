@@ -1,18 +1,29 @@
 package de.solixmonitor.android.data
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.SocketTimeoutException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.net.Socket
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-class SolixRepository {
-    suspend fun readSnapshot(settings: SolixSettings): SolixSnapshot = withContext(Dispatchers.IO) {
-        settings.validate().getOrThrow()
-        if (settings.demoMode) demoSnapshot() else liveSnapshot(settings)
+class SolixRepository(context: Context) {
+    private val connectivityManager =
+        context.applicationContext.getSystemService(ConnectivityManager::class.java)
+    private val ioMutex = Mutex()
+
+    suspend fun readSnapshot(settings: SolixSettings): SolixSnapshot = ioMutex.withLock {
+        withContext(Dispatchers.IO) {
+            settings.validate().getOrThrow()
+            if (settings.demoMode) demoSnapshot() else liveSnapshot(settings)
+        }
     }
 
     private fun liveSnapshot(settings: SolixSettings): SolixSnapshot {
@@ -26,20 +37,16 @@ class SolixRepository {
             }
         }
 
-        val error = requireNotNull(lastError)
-        if (generateSequence<Throwable>(error) { it.cause }.any { it is SocketTimeoutException }) {
-            throw IllegalStateException(
-                "Port ${settings.port} ist erreichbar, aber die Solarbank antwortet nicht auf Modbus. " +
-                    "Prüfe, ob Modbus TCP aktiviert ist, die IP zur Solarbank gehört und kein anderer " +
-                    "Modbus-Client verbunden ist.",
-                error,
-            )
-        }
-        throw error
+        throw requireNotNull(lastError)
     }
 
     private fun readLiveSnapshot(settings: SolixSettings): SolixSnapshot {
-        ModbusTcpClient(settings.host, settings.port, settings.unitId).use { client ->
+        ModbusTcpClient(
+            settings.host,
+            settings.port,
+            settings.unitId,
+            socket = createWifiSocket(),
+        ).use { client ->
             val live = client.readInput(10000, 51)
             val totals = runCatching { client.readInput(10208, 58) }.getOrDefault(intArrayOf())
             val info = runCatching { client.readInput(10090, 67) }.getOrDefault(intArrayOf())
@@ -103,7 +110,7 @@ class SolixRepository {
         return SolixSnapshot(
             timestampMs = now,
             deviceModel = "Solarbank 4 E5000 Pro",
-            firmware = "Android-Demo 0.1.1",
+            firmware = "Android-Demo 0.1.3",
             connected = true,
             pvW = pv,
             loadW = load,
@@ -120,6 +127,14 @@ class SolixRepository {
             maxChargeW = 2400,
             maxDischargeW = 2400,
         )
+    }
+
+    private fun createWifiSocket(): Socket {
+        val wifiNetwork = connectivityManager.allNetworks.firstOrNull { network ->
+            connectivityManager.getNetworkCapabilities(network)
+                ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        }
+        return wifiNetwork?.socketFactory?.createSocket() ?: Socket()
     }
 
     internal companion object {
